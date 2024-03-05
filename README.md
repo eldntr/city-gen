@@ -5,8 +5,7 @@ The package comes with a sample dataset of Bruges, however you will need to get 
 
 ## DEMO
 
--   setup https://tania.tours/demo2/
--   start https://tania.tours/demo1/
+-   list of demos available at https://tania.tours/demo
 
 ## Getting GeoJSON data
 

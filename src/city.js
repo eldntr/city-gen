@@ -12,50 +12,118 @@ async function loadGeoJsonAsync() {
 	});
 }
 
+function convertPointToPolygon(point, radius = 0.0001) {
+    const [lon, lat] = point;
+
+    // Membuat segi lima kecil di sekitar `Point` untuk merepresentasikan area yang kecil
+    return [
+        [
+            [lon - radius, lat - radius],
+            [lon + radius, lat - radius],
+            [lon + radius, lat + radius],
+            [lon - radius, lat + radius],
+            [lon - radius, lat - radius]
+        ]
+    ];
+}
+
+
 function create3dObjects(data) {
-	let coordinates = data.geometry.coordinates;
-	let properties = data.properties;
+    let geometryType = data.geometry.type;
+    let coordinates = data.geometry.coordinates;
+    let properties = data.properties;
 
-	if (properties.building) {
-		//if data is a building property (if it's a building)
-		let building_levels = data.properties["building:levels"] || 1; //if building:levels property exists use it, otherwise use 1
-		$.buildingArray.push(generateBuilding(coordinates, building_levels));
-	} else if (properties.highway && data.geometry.type != "Point") {
-		let road = generateRoad(coordinates, properties);
-		if (road != undefined) {
-			$.roadArray.push(road);
-		}
-	} else if (properties.natural) {
-		$.waterArray.push(generateWater(coordinates, properties));
-	} else if (properties.leisure) {
-		//test green
-		$.greenArray.push(generateGreen(coordinates));
-	}
+    if (properties.building && (geometryType === "Polygon" || geometryType === "MultiPolygon")) {
+        let building_levels = properties["building:levels"] || 1;
+        let buildingGeometry = generateBuilding(coordinates, building_levels);
+        if (buildingGeometry) {
+            $.buildingArray.push(buildingGeometry);
+        }
+
+    } else if (properties.highway && geometryType === "LineString") {
+        let road = generateRoad(coordinates, properties);
+        if (road) {
+            $.roadArray.push(road);
+        }
+
+    } else if (properties.natural && (geometryType === "Polygon" || geometryType === "MultiPolygon")) {
+        let waterGeometry = generateWater(coordinates, properties);
+        if (waterGeometry) {
+            $.waterArray.push(waterGeometry);
+        }
+
+    } else if (properties.leisure && (geometryType === "Polygon" || geometryType === "MultiPolygon")) {
+        let greenGeometry = generateGreen(coordinates);
+        if (greenGeometry) {
+            $.greenArray.push(greenGeometry);
+        }
+
+    } else if (geometryType === "Point") {
+        const pointPolygon = convertPointToPolygon(coordinates);
+        if (properties.natural) {
+            let waterGeometry = generateWater(pointPolygon, properties);
+            if (waterGeometry) {
+                $.waterArray.push(waterGeometry);
+            }
+        } else if (properties.leisure) {
+            let greenGeometry = generateGreen(pointPolygon);
+            if (greenGeometry) {
+                $.greenArray.push(greenGeometry);
+            }
+        }
+
+    } else {
+        console.warn("Skipping unsupported geometry type or invalid coordinates structure:", geometryType, coordinates);
+    }
 }
 
-// GENERATE SHAPE AND FILL UP ARRAYS
 function generateBuilding(coordinates, height = 1) {
-	//each geojson "object" has multiple arrays of coordinates.
-	//the first array is the main (outer) building shape
-	//the second & third & .. are the "holes" in the building
-	let buildingShape, buildingGeometry; //main building
-	// let buildingHoles = []; //holes to punch out shape
+    let buildingShape, buildingGeometry;
 
-	coordinates.forEach((points, index) => {
-		//for each building do:
-		if (index == 0) {
-			//create main building shape
-			buildingShape = generateShape(points);
-		} else {
-			//create shape of holes in building
-			buildingShape.holes.push(generateShape(points));
-			// buildingHoles.push(generateShape(points));
-		}
-	});
+    // Jika koordinat adalah MultiPolygon, ambil bagian pertama
+    if (Array.isArray(coordinates[0][0][0])) {
+        coordinates = coordinates[0];
+    }
 
-	buildingGeometry = generateGeometry(buildingShape, height);
-	return buildingGeometry;
+    // Pastikan koordinat valid
+    if (!Array.isArray(coordinates) || coordinates.length === 0) {
+        console.warn("Invalid building coordinates:", coordinates);
+        return undefined;
+    }
+
+    coordinates.forEach((points, index) => {
+        // Setiap `points` harus memiliki setidaknya 3 titik agar dapat membentuk area
+        if (!Array.isArray(points) || points.length < 3) {
+            console.warn("Invalid polygon structure, must have at least 3 points:", points);
+            return; // Skip this iteration if points are invalid
+        }
+
+        if (index === 0) {
+            buildingShape = generateShape(points);
+            if (!buildingShape) {
+                console.warn("Failed to generate main building shape:", points);
+            }
+        } else {
+            if (buildingShape) {
+                const holeShape = generateShape(points);
+                if (holeShape) {
+                    buildingShape.holes.push(holeShape);
+                } else {
+                    console.warn("Failed to generate hole for building:", points);
+                }
+            }
+        }
+    });
+
+    if (!buildingShape) {
+        console.warn("Failed to generate valid building shape for coordinates:", coordinates);
+        return undefined;
+    }
+
+    buildingGeometry = generateGeometry(buildingShape, height);
+    return buildingGeometry;
 }
+
 
 function generateRoad(coordinates, properties, height = 0) {
 	// console.log(1);
@@ -86,68 +154,115 @@ function generateRoad(coordinates, properties, height = 0) {
 }
 
 function generateWater(coordinates, properties, height = 0.007) {
-	//each geojson "object" has multiple arrays of coordinates.
-	//the first array is the main (outer) building shape
-	//the second & third & .. are the "holes" in the building
-	let waterShape, waterGeometry; //main building
-	// let buildingHoles = []; //holes to punch out shape
+    let waterShape, waterGeometry;
 
-	coordinates.forEach((points, index) => {
-		//for each building do:
-		if (index == 0) {
-			//create main building shape
-			waterShape = generateShape(points);
-		} else {
-			//create shape of holes in building
-			waterShape.holes.push(generateShape(points));
-			// buildingHoles.push(generateShape(points));
-		}
-	});
+    if (Array.isArray(coordinates[0][0][0])) {
+        coordinates = coordinates[0];
+    }
 
-	waterGeometry = generateGeometry(waterShape, height);
-	return waterGeometry;
+    // Pastikan koordinat valid sebelum melanjutkan
+    if (!Array.isArray(coordinates) || coordinates.length === 0) {
+        console.warn("Invalid water coordinates:", coordinates);
+        return undefined;
+    }
+
+    coordinates.forEach((points, index) => {
+        if (index === 0) {
+            waterShape = generateShape(points);
+        } else {
+            if (waterShape) {
+                waterShape.holes.push(generateShape(points));
+            } else {
+                console.warn("Unable to create main water shape:", points);
+            }
+        }
+    });
+
+    if (!waterShape) {
+        console.warn("Failed to generate water shape for coordinates:", coordinates);
+        return undefined;
+    }
+
+    try {
+        waterGeometry = generateGeometry(waterShape, height);
+    } catch (error) {
+        console.error("Error generating water geometry:", error);
+        return undefined;
+    }
+    
+    return waterGeometry;
 }
 
 function generateGreen(coordinates, height = 0) {
-	//each geojson "object" has multiple arrays of coordinates.
-	//the first array is the main (outer) building shape
-	//the second & third & .. are the "holes" in the building
-	let greenShape, greenGeometry; //main building
-	// let buildingHoles = []; //holes to punch out shape
+    let greenShape, greenGeometry;
 
-	coordinates.forEach((points, index) => {
-		//for each building do:
-		if (index == 0) {
-			//create main building shape
-			greenShape = generateShape(points);
-		} else {
-			//create shape of holes in building
-			greenShape.holes.push(generateShape(points));
-			// buildingHoles.push(generateShape(points));
-		}
-	});
+    if (Array.isArray(coordinates[0][0][0])) {
+        coordinates = coordinates[0];
+    }
 
-	greenGeometry = generateGeometry(greenShape, height);
-	return greenGeometry;
+    if (!Array.isArray(coordinates) || coordinates.length === 0) {
+        console.warn("Invalid green coordinates:", coordinates);
+        return undefined;
+    }
+
+    coordinates.forEach((points, index) => {
+        if (index === 0) {
+            greenShape = generateShape(points);
+        } else {
+            if (greenShape) {
+                greenShape.holes.push(generateShape(points));
+            } else {
+                console.warn("Unable to create main green shape:", points);
+            }
+        }
+    });
+
+    if (!greenShape) {
+        console.warn("Failed to generate green shape for coordinates:", coordinates);
+        return undefined;
+    }
+
+    try {
+        greenGeometry = generateGeometry(greenShape, height);
+    } catch (error) {
+        console.error("Error generating green geometry:", error);
+        return undefined;
+    }
+    
+    return greenGeometry;
 }
 
 function generateShape(polygon) {
-	let shape = new THREE.Shape(); //only a single polygon?
+    if (!Array.isArray(polygon) || polygon.length < 3) {
+        console.warn("Invalid polygon structure, must have at least 3 points:", polygon);
+        return undefined;
+    }
 
-	polygon.forEach((coordinates, index) => {
-		let coords = normalizeCoordinates(coordinates, $.config.citycenter);
-		if (index == 0) {
-			shape.moveTo(coords[0], coords[1]);
-		} else {
-			shape.lineTo(coords[0], coords[1]);
-		}
+    let shape = new THREE.Shape();
 
-		// console.log(coordinates);
-		// shape.moveTo(coordinates[0], coordinates[1]);
-	});
+    try {
+        polygon.forEach((coordinates, index) => {
+            let coords = normalizeCoordinates(coordinates, $.config.citycenter);
+            if (index === 0) {
+                shape.moveTo(coords[0], coords[1]);
+            } else {
+                shape.lineTo(coords[0], coords[1]);
+            }
+        });
 
-	return shape;
+        if (shape.curves.length === 0) {
+            console.warn("Failed to generate valid shape, no valid curves created:", polygon);
+            return undefined;
+        }
+
+    } catch (error) {
+        console.error("Error generating shape:", error);
+        return undefined;
+    }
+
+    return shape;
 }
+
 
 function generateGeometry(shape, height) {
 	// let height = 1;
@@ -207,29 +322,49 @@ function spawnRoads() {
 }
 
 function spawnWater() {
-	let mergedGeometry = mergeBufferGeometries($.waterArray);
+    const validGeometries = $.waterArray.filter((geometry) => geometry !== undefined);
+    if (validGeometries.length > 0) {
+        let mergedGeometry;
+        try {
+            mergedGeometry = mergeBufferGeometries(validGeometries);
+        } catch (error) {
+            console.error("Error merging water geometries:", error);
+            return;
+        }
 
-	const mesh = new THREE.Mesh(mergedGeometry, $.material_water);
-	mesh.name = "WATER";
-	mesh.updateMatrix();
-
-	mesh.position.y -= 0.01;
-	mesh.layers.set(0);
-	mesh.frustumCulled = false;
-	$.scene.add(mesh);
+        const mesh = new THREE.Mesh(mergedGeometry, $.material_water);
+        mesh.name = "WATER";
+        mesh.updateMatrix();
+        mesh.position.y -= 0.01;
+        mesh.layers.set(0);
+        mesh.frustumCulled = false;
+        $.scene.add(mesh);
+    } else {
+        console.warn("No valid water geometries to spawn.");
+    }
 }
 
 function spawnGreen() {
-	let mergedGeometry = mergeBufferGeometries($.greenArray);
+    const validGeometries = $.greenArray.filter((geometry) => geometry !== undefined);
+    if (validGeometries.length > 0) {
+        let mergedGeometry;
+        try {
+            mergedGeometry = mergeBufferGeometries(validGeometries);
+        } catch (error) {
+            console.error("Error merging green geometries:", error);
+            return;
+        }
 
-	const mesh = new THREE.Mesh(mergedGeometry, $.material_green);
-	mesh.name = "GREEN";
-	mesh.updateMatrix();
-
-	mesh.position.y -= 0.01;
-	mesh.layers.set(0);
-	mesh.frustumCulled = false;
-	$.scene.add(mesh);
+        const mesh = new THREE.Mesh(mergedGeometry, $.material_green);
+        mesh.name = "GREEN";
+        mesh.updateMatrix();
+        mesh.position.y -= 0.01;
+        mesh.layers.set(0);
+        mesh.frustumCulled = false;
+        $.scene.add(mesh);
+    } else {
+        console.warn("No valid green geometries to spawn.");
+    }
 }
 
 function spawnGround() {
@@ -248,22 +383,21 @@ function spawnGround() {
 	$.scene.add(plane);
 }
 
-//GENERAL FUNCTION
 function normalizeCoordinates(objectPosition, centerPosition) {
-	// Get GPS distance
-	let dis = GEOLIB.getDistance(objectPosition, centerPosition);
+    // Get GPS distance (in meters)
+    let dis = GEOLIB.getDistance(objectPosition, centerPosition);
 
-	// Get bearing angle
-	let bearing = GEOLIB.getRhumbLineBearing(objectPosition, centerPosition);
+    // Get bearing angle
+    let bearing = GEOLIB.getRhumbLineBearing(objectPosition, centerPosition);
 
-	// Calculate X by centerPosi.x + distance * cos(rad)
-	let x = centerPosition[0] + dis * Math.cos((bearing * Math.PI) / 180);
+    // Calculate X by centerPosi.x + distance * cos(rad)
+    let x = dis * Math.cos((bearing * Math.PI) / 180);
 
-	// Calculate Y by centerPosi.y + distance * sin(rad)
-	let y = centerPosition[1] + dis * Math.sin((bearing * Math.PI) / 180);
+    // Calculate Y by centerPosi.y + distance * sin(rad)
+    let y = dis * Math.sin((bearing * Math.PI) / 180);
 
-	// Reverse X (it work)
-	return [-x / 100, y / 100];
+    // Reverse X to adjust the map projection direction (depending on your coordinate system)
+    return [-x / 1000, y / 1000]; // Scaling down to fit in the `three.js` scene (adjust scale as needed)
 }
 
 //main function

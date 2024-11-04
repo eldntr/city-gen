@@ -39,47 +39,19 @@ async function animatePath() {
 }
 
 async function loadPath() {
-	return await fetch($.config.path).then((response) => {
-		return response.json().then((data) => {
-			return data;
-		});
-	});
+    // Sebelumnya mengakses path dari $.config
+    // Sekarang menggunakan data langsung dari $.lineArray
+    return Array.from($.lineArrayBackup);
 }
+
 
 //CAMERA PATH
 async function drawSpline(data) {
-	// let data = await loadPath();
-
-	// const curve = new THREE.CatmullRomCurve3(data);
-	$.cameraPath = new THREE.CatmullRomCurve3(data);
-
-	//ACTUALLY DRAW IT.
-	// spawnSpline();
-	function spawnSpline() {
-		const points = $.cameraPath.getPoints(50);
-
-		const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-		const material = new THREE.LineBasicMaterial({
-			color: 0xffffff,
-			linewidth: 10,
-			transparent: false,
-			opacity: 1,
-		});
-		// const material = new THREE.LineDashedMaterial({
-		// 	color: 0xffffff,
-		// 	linewidth: 1,
-		// 	scale: 1,
-		// 	// dashSize: 1, // to be updated in the render loop
-		// 	// gapSize: 1e10, // a big number, so only one dash is rendered
-		// });
-
-		// const curveObject = new THREE.Line(geometry, material);
-		let line = new THREE.Line(geometry, material);
-
-		$.scene.add(line);
-	}
+    // Menggunakan lineArray langsung
+    $.cameraPath = new THREE.CatmullRomCurve3(data || lineArrayVector3);
+    spawnSpline();
 }
+
 
 //ANIMATED PATH
 function drawLine() {

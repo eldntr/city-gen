@@ -88,29 +88,23 @@ function initializeDynamicLine() {
 }
 
 function savePath() {
-	let data = [];
+    let data = [];
 
-	for (let index = 0; index < $.lineClickCounter; index++) {
-		let obj = [
-			$.lineArray[index * 3 + 0],
-			$.lineArray[index * 3 + 1],
-			$.lineArray[index * 3 + 2],
-		];
-		data.push(obj);
-	}
+    for (let index = 0; index < $.lineClickCounter; index++) {
+        let obj = [
+            $.lineArray[index * 3 + 0],
+            $.lineArray[index * 3 + 1],
+            $.lineArray[index * 3 + 2],
+        ];
+        data.push(obj);
+    }
 
-	let pathData = JSON.stringify(data);
+    let pathData = JSON.stringify(data);
 
-	download(pathData, "path.json", "text/plain");
-
-	function download(content, fileName, contentType) {
-		var a = document.createElement("a");
-		var file = new Blob([content], { type: contentType });
-		a.href = URL.createObjectURL(file);
-		a.download = fileName;
-		a.click();
-	}
+    console.log("Path saved locally, modify as per your need");
+    // Tidak lagi mendownload file
 }
+
 
 function onMouseMove(event) {
 	//update mouseposition & sphere position

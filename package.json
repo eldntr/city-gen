@@ -7,6 +7,7 @@
 		"example": "examples"
 	},
 	"scripts": {
+		"dev": "vite",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	},
 	"repository": {
@@ -27,6 +28,7 @@
 	"homepage": "https://github.com/elfensky/storymap#readme",
 	"dependencies": {
 		"geolib": "^3.3.3",
-		"three": "^0.137.5"
+		"three": "^0.137.5",
+		"vite": "^5.4.10"
 	}
 }

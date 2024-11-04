@@ -34,17 +34,17 @@ export const GLOBAL = {
 	hit: false,
 
 	config: {
-		debug: true,
-		data: "/node_modules/storymap/sample/bruges.geojson",
-		path: "/node_modules/storymap/sample/path.json",
-		container: "container",
-		citycenter: [3.227183, 51.209651],
-		color_background: 0x222222,
-		color_buildings: 0xfafafa,
-		grid: { primary: 0x555555, secondary: 0x333333 },
-		color_ground: 0x00ff00,
-		opacity_ground: 0.25,
+	    debug: true,
+	    data: "/node_modules/storymap/sample/bruges.geojson",
+	    container: "container",
+	    citycenter: [3.227183, 51.209651],
+	    color_background: 0x222222,
+	    color_buildings: 0xfafafa,
+	    grid: { primary: 0x555555, secondary: 0x333333 },
+	    color_ground: 0x00ff00,
+	    opacity_ground: 0.25,
 	},
+
 	material_ground: new THREE.MeshPhongMaterial({
 		color: 0x00ff00,
 		transparent: true,

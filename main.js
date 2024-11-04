@@ -2,10 +2,10 @@ import * as storymap from "./index";
 
 storymap.global.config = {
     debug: false,
-    data: "./sample/bruges.geojson",
+    data: "./sample/Eiffel Area.geojson",
     path: "./sample/path.json",
     container: "container", // This should match the id of the canvas element
-    citycenter: [3.227183, 51.209651],
+    citycenter: [2.295455689752966, 48.85530405243387],
     spawn: {
         buildings: true,
         ground: true,
